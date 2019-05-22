@@ -6,6 +6,7 @@ I'm doing this to:
 1. Have a public record of some of the stuff I've been working on over the past year
 2. Get better at documentation
 3. Maybe help others who are trying to work on something similar learn implementation  
+  
 The ezdatasets.py module is useful for loading a folder of images into python, feel free to put your
 own photos into a dataset folder and try it
 # Goals:
