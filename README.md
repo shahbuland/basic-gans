@@ -20,3 +20,9 @@ own photos into a dataset folder and try it
 <a name="fn2">2</a>: https://arxiv.org/pdf/1701.07875.pdf  
 <a name="fn3">3</a>: https://arxiv.org/pdf/1704.00028.pdf  
 <a name="fn4">4</a>: https://arxiv.org/pdf/1710.10196.pdf  
+
+# Results
+Left/Mid/Right : Real/DCGAN/GP-WGAN  
+<img src="https://github.com/shahbuland/basic-gans/blob/master/results/dcgan/cars/real.png" alt="Real" height="250" width="250">
+<img src="https://github.com/shahbuland/basic-gans/blob/master/results/dcgan/cars/fake.png" alt="Real" height="250" width="250">
+<img src="https://github.com/shahbuland/basic-gans/blob/master/results/gpwgan/cars/fake.png" alt="Real" height="250" width="250">
