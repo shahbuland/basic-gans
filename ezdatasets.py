@@ -33,9 +33,12 @@ def GetTrainingData(dataset_name, norm_style=None,
         X.append(data)
     return np.asarray(X)
 
+  
+# Convert data for numpy to data for torch (moves axes as required by torch models)
 def torch(data):
     return torch.from_numpy(np.moveaxis(data,3,1))
 
+# Samples r*c images from a dataset
 def sample(dataset,r,c):
     n = r*c
     n_max = dataset.shape[0]
