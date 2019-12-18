@@ -1,48 +1,134 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+from layers import *
+from math import floor, ceil 
+from ops import weighted_sum
 
-class GenConvBlock(nn.Module):
-	def __init__(self, C_in, C_out, K=4, S=1, P=1, BN=True, Up=True, Scale=2)
-		super(GenConvBlock,self).__init__()
-		self.BN = BN
-		self.Up = Up
-		if UP:
-			self.up = lambda x : F.interpolate(x, scale_factor=(Scale,Scale))
-		self.conv = nn.Conv2d(C_in,C_out,K,S,P)
-		if BN:
-			self.bn = nn.BatchNorm2d(C_out)
-	
-	# Act is specified in forward as it may change
-	def forward(self, x, Act):
-		if self.UP: x = self.up(x)
-		x = self.conv(x)
-		x = self.Act(x)
-		if self.BN: x = self.bn(x)
-		
-		return x
-		
-class Generator(nn.Module):
+# Progressive generator
+class ProgGen(nn.Module):
 	def __init__(self):
-		super(Generator, self).__init__()
-
-		self.conv_layers = nn.ModuleList()
-
-		self.conv_layers.append(GenConvBlock(1,512,K=4,P=0,Up=False))
-		# 512,4,4
-		self.conv_layers.append(GenConvBlock(512,256))
-		# 256,8,8
-		self.conv_layers.append(GenConvBlock(256,128))
-		# 128,16,16
-		self.conv_layers.append(GenConvBlock(128,64))
-		# 64,32,32
-		self.conv_layers.append(GenConvBlock(64,CHANNELS,Act=F.torch,BN=False)
-		# 3,64,64
-
-		self.progress = INITIAL_PROGRESS # How many layers to use at start
-		# Max progress in this case is 5
-
-	def forward(self, x):
+		super(ProgGen, self).__init__()
 	
-	for l in range(self.progress):
+		ch = [512,512,512,256,128,64]	
+		self.current_progress = 0
+		self.max_progress = len(ch)-2 
+		self.blocks = nn.ModuleList()
+		self.fc = nn.Linear(100,512*4*4)
+	
+		for i in range(len(ch)-1):
+			self.blocks.append(GenConv(ch[i],ch[i+1],name="GenConv"+str(i)))
+		
+	def trans_info(self):
+		# Current progress tells us last layer being used
+		# If its .5 that means second last still transitioning
+		return False if (self.current_progress % 1 == 0) else True
+	
+	def grow(self):
+		# Do nothing if already grown up
+		if self.current_progress == self.max_progress: return
+
+		self.current_progress += 0.5 # Progress
 			
+		transitioning = self.trans_info()
+
+		if transitioning:
+			# Takes block to phase 1
+			self.blocks[floor(self.current_progress)].grow()
+		else:
+			# Take block thats at the front and brings it to phase 1
+			# Also adds new block 
+			self.blocks[floor(self.current_progress)-1].grow()
+
+	# Brings to max size
+	def fullgrow(self):
+		self.current_progress = self.max_progress
+
+	def forward(self,x):
+		
+		# If transitioning, we will do a weighted sum if upsampled
+		# Output of transitioning layer and output of new layer
+		transitioning = self.trans_info()
+		
+		x = self.fc(x)
+		x = x.view(-1,512,4,4)
+		# If current progress is max progress, this loop does everything
+		for i in range(floor(self.current_progress)+1):
+			x = self.blocks[i](x)
+		
+		if transitioning:
+			assert self.blocks[floor(self.current_progress)].RGBphase == 1
+			# If we're transitioning, x should be a tuple now
+			x,z = x	
+			x = self.blocks[ceil(self.current_progress)](x)
+			x = weighted_sum(z,x)
+
+		return x		
+		
+# Progressive discriminator
+class ProgDisc(nn.Module):
+	def __init__(self):
+		super(ProgDisc, self).__init__()
+		
+		ch = [64,128,256,512,512]
+				
+		self.current_progress = 0
+		self.max_progress = len(ch)-2
+		self.blocks = nn.ModuleList()
+
+		for i in range(len(ch)- 1):
+			self.blocks.append(DiscConv(ch[i],ch[i+1],name="DiscConv"+str(i)))
+
+		self.fc = nn.Linear(512*4*4,1)
+
+	# Tells us whether a layer as transitioning or not
+	def trans_info(self):
+		return False if self.current_progress % 1 == 0 else True
+
+	def grow(self):
+		if self.current_progress == self.max_progress: return
+
+		self.current_progress += 0.5
+
+		# This is what we have just entered (not what we WERE in)
+		transitioning = self.trans_info()
+
+		if transitioning:
+			# Enter layer into transition phase
+			ind = -1*floor(self.current_progress) - 1
+			self.blocks[ind].grow()
+		else:
+			# Make last transitioning layer exit transition phase
+			ind = -1*(floor(self.current_progress) - 1) - 1
+			self.blocks[ind].grow()
+
+	def fullgrow(self):
+		self.current_progress = self.max_progress
+
+	def forward(self,x):
+		
+		transitioning = self.trans_info()
+
+		# This gets confusing cause its reverse of how it was for generator
+		# Suppose we feed image into discriminator
+		# If layer is transitioning, it will be the second layer
+		if transitioning:
+			# If second layer is transitioning
+			# It should receive weighted sum of first layer output (x)
+			# And downsampled input image (z)
+			z = nn.MaxPool2d(2)(x)
+			z = self.blocks[-1*(floor(self.current_progress))-1].rgb(z)
+			x = self.blocks[-1*(ceil(self.current_progress))-1](x) 
+			x = weighted_sum(z,x)
+
+		# Start passing at -1*current_progress - 1'th layer
+		for i in range(-1*floor(self.current_progress) -1,0):
+			x = self.blocks[i](x)
+
+		x = x.view(-1,512*4*4)
+		x = self.fc(x)
+	
+		return x
+
+# AND FINALLY, THE ACTUAL MODEL
+class ProgGan
