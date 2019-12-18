@@ -45,7 +45,6 @@ class ProgGen(nn.Module):
 		self.current_progress = self.max_progress
 
 	def forward(self,x):
-		
 		# If transitioning, we will do a weighted sum if upsampled
 		# Output of transitioning layer and output of new layer
 		transitioning = self.trans_info()
@@ -131,4 +130,41 @@ class ProgDisc(nn.Module):
 		return x
 
 # AND FINALLY, THE ACTUAL MODEL
-class ProgGan
+class ProgGan(nn.Module):
+	def __init__(self):
+		super(ProgGan,self).__init__()
+		
+		self.progress = 0
+		
+		self.gen = ProgGen()
+		self.disc = ProgDisc()
+	
+		self.max_progress = self.gen.max_progress
+
+		self.optG = torch.optim.Adam(self.gen.parameters(),lr=LEARNING_RATE,betas=(0.5,0.9))
+		self.optD = torch.optim.Adam(self.disc.parameters(),lr=LEARNING_RATE,betas=(0.5,0.9))
+
+	def grow(self):
+		if self.progress != self.max_progress: self.progress += 1
+		self.gen.grow()
+		self.disc.grow()
+		
+	def fullgrow(self):
+		self.progress = self.max_progress
+		self.gen.fullgrow()
+		self.disc.fullgrow()
+
+	# n is number of samples to generate
+	def generate(self,n):
+		x = torch.randn(n,100)
+		return self.gen(x)
+
+	def save_checkpoint(self):
+		torch.save(self.state_dict(),"params.pt")
+
+	def load_checkpoint(self):
+		try:
+			self.load_state_dict(torch.load("params.pt"))
+			print("Loaded checkpoint")
+		except:
+			print("Could not load checkpoint")
