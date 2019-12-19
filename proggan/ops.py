@@ -2,6 +2,7 @@ import torch
 from torch import autograd
 from constants import *
 import torch.nn.functional as F
+from math import ceil
 
 def weights_init_normal(m):
     classname = m.__class__.__name__
@@ -11,23 +12,25 @@ def weights_init_normal(m):
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(m.bias.data, 0.0)
 
-def weighted_sum(x,y):
+def weighted_sum(x,y,ALPHA):
 	return ((1-ALPHA)*x + (ALPHA*y))
 
-def wasserstein_loss(y,y_real):
-	return torch.mean(y_y_real)
+def image_size_from_progress(prog):
+	return 8*(2**ceil(prog))
 
 # Copied from my previous implementation, still don't know what it does
 def GP_Loss(D,y,y_real,prog):
+	prog = ceil(prog)
 	alpha = torch.rand(BATCH_SIZE,1)
 	alpha = alpha.expand(BATCH_SIZE,int(y_real.numel()/BATCH_SIZE))
-	alpha = alpha.view(-1,CHANNELS,8*(2**prog),8*(2**prog))
+	size = image_size_from_progress(prog)
+	alpha = alpha.view(-1,CHANNELS,size,size)
 	if USE_CUDA: alpha = alpha.cuda()
 
 	inp = alpha*y_real + (1-alpha)*y
 	out = D(inp)
 	valid = torch.ones(out.size()).float()
-	if USE_CUDA: valid.cuda()
+	if USE_CUDA: valid = valid.cuda()
 
 	grads = autograd.grad(outputs=out,
 						  inputs=inp,
@@ -38,6 +41,7 @@ def GP_Loss(D,y,y_real,prog):
 
 # corrects batch by bringing down image size for the models progression
 def correct_batch(batch, prog):
-	desired_size = 8 * (2**(prog))
+	prog = ceil(prog)
+	desired_size = image_size_from_progress(prog)
 	batch = F.interpolate(batch, size=(desired_size,desired_size))
 	return batch

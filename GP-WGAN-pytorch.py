@@ -6,7 +6,7 @@ import os
 from PIL import Image
 from torch import autograd
 import matplotlib.pyplot as plt
-import ezdatasets as ezd
+import datasets
 from torchsummary import summary
 
 
@@ -26,7 +26,7 @@ iters = 2500
 
 MAX_FILTERS = 256 # The largest number of filters used in CNNs
 
-training_data = ezd.GetTrainingData("person", shape=(img_size,img_size),
+training_data = datasets.GetTrainingData("person", shape=(img_size,img_size),
                                     norm_style=norm)
 training_data = np.moveaxis(training_data,3,1)
 

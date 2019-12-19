@@ -65,7 +65,7 @@ class fromRGB(nn.Module):
 
 # Layer for generic Discriminator conv block
 class DiscConv(nn.Module):
-	def __init__(self,fi,fo,k=3,s=1,p=1,useBN=True,useDP=True,name=None):
+	def __init__(self,fi,fo,k=3,s=1,p=1,useBN=True,useDP=False,name=None):
 		super(DiscConv, self).__init__()
 		
 		self.name = name

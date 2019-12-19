@@ -6,7 +6,7 @@ import os
 from PIL import Image
 from torch.autograd import Variable
 import matplotlib.pyplot as plt
-import ezdatasets as ezd
+import datasets
 
 
 deconv_mode = "transpose" # currently supports "transpose" and "upsample"
@@ -14,7 +14,7 @@ use_dropout = False
 norm = "sigmoid" # currently supports "sigmoid" and "tanh"
 load_checkpoints = False
 cuda = True # Set true if you want to use gpu, false otherwise
-training_data = ezd.GetTrainingData("car", norm_style=norm)
+training_data = datasets.GetTrainingData("car", norm_style=norm)
 training_data = np.moveaxis(training_data,3,1)
 
 print("data shape", training_data.shape)

@@ -10,15 +10,23 @@ class ProgGen(nn.Module):
 	def __init__(self):
 		super(ProgGen, self).__init__()
 	
-		ch = [512,512,512,256,128,64]	
+		ch = [512,512,512,512,256,128,64]	
 		self.current_progress = 0
 		self.max_progress = len(ch)-2 
 		self.blocks = nn.ModuleList()
 		self.fc = nn.Linear(100,512*4*4)
+		self.alpha = 0
 	
 		for i in range(len(ch)-1):
 			self.blocks.append(GenConv(ch[i],ch[i+1],name="GenConv"+str(i)))
+			# Get rid of grad to increase training speed
+			for p in self.blocks[i].parameters():
+				p.requires_grad = False
 		
+		# Turn on grads in first layer
+		for p in self.blocks[0].parameters():
+			p.requires_grad = True
+
 	def trans_info(self):
 		# Current progress tells us last layer being used
 		# If its .5 that means second last still transitioning
@@ -27,17 +35,20 @@ class ProgGen(nn.Module):
 	def grow(self):
 		# Do nothing if already grown up
 		if self.current_progress == self.max_progress: return
-
+		
 		self.current_progress += 0.5 # Progress
-			
+		self.alpha = 0
+	
 		transitioning = self.trans_info()
 
 		if transitioning:
 			# Takes block to phase 1
+			# Adds new block 
 			self.blocks[floor(self.current_progress)].grow()
+			for p in self.blocks[ceil(self.current_progress)].parameters():
+				p.requires_grad = True
 		else:
 			# Take block thats at the front and brings it to phase 1
-			# Also adds new block 
 			self.blocks[floor(self.current_progress)-1].grow()
 
 	# Brings to max size
@@ -54,13 +65,15 @@ class ProgGen(nn.Module):
 		# If current progress is max progress, this loop does everything
 		for i in range(floor(self.current_progress)+1):
 			x = self.blocks[i](x)
-		
+			
 		if transitioning:
 			assert self.blocks[floor(self.current_progress)].RGBphase == 1
 			# If we're transitioning, x should be a tuple now
 			x,z = x	
 			x = self.blocks[ceil(self.current_progress)](x)
-			x = weighted_sum(z,x)
+			self.alpha += 1/GROW_INTERVAL
+			self.alpha = min(self.alpha, 1)
+			x = weighted_sum(z,x,self.alpha)
 
 		return x		
 		
@@ -69,7 +82,7 @@ class ProgDisc(nn.Module):
 	def __init__(self):
 		super(ProgDisc, self).__init__()
 		
-		ch = [64,128,256,512,512]
+		ch = [64,128,256,512,512,512]
 				
 		self.current_progress = 0
 		self.max_progress = len(ch)-2
@@ -77,8 +90,15 @@ class ProgDisc(nn.Module):
 
 		for i in range(len(ch)- 1):
 			self.blocks.append(DiscConv(ch[i],ch[i+1],name="DiscConv"+str(i)))
+			for p in self.blocks[i].parameters():
+				p.requires_grad = False
+
+		for p in self.blocks[0].parameters():
+			p.requires_grad = True
 
 		self.fc = nn.Linear(512*4*4,1)
+
+		self.alpha = 0
 
 	# Tells us whether a layer as transitioning or not
 	def trans_info(self):
@@ -88,14 +108,17 @@ class ProgDisc(nn.Module):
 		if self.current_progress == self.max_progress: return
 
 		self.current_progress += 0.5
+		self.alpha = 0
 
 		# This is what we have just entered (not what we WERE in)
 		transitioning = self.trans_info()
 
 		if transitioning:
-			# Enter layer into transition phase
+			# Enter layer into transition phase, add new block
 			ind = -1*floor(self.current_progress) - 1
 			self.blocks[ind].grow()
+			for p in self.blocks[ind-1].parameters():
+				p.requires_grad = True
 		else:
 			# Make last transitioning layer exit transition phase
 			ind = -1*(floor(self.current_progress) - 1) - 1
@@ -118,7 +141,9 @@ class ProgDisc(nn.Module):
 			z = nn.MaxPool2d(2)(x)
 			z = self.blocks[-1*(floor(self.current_progress))-1].rgb(z)
 			x = self.blocks[-1*(ceil(self.current_progress))-1](x) 
-			x = weighted_sum(z,x)
+			self.alpha += 1/GROW_INTERVAL
+			self.alpha = min(1,self.alpha)
+			x = weighted_sum(z,x,self.alpha)
 
 		# Start passing at -1*current_progress - 1'th layer
 		for i in range(-1*floor(self.current_progress) -1,0):
@@ -141,8 +166,8 @@ class ProgGan(nn.Module):
 	
 		self.max_progress = self.gen.max_progress
 
-		self.optG = torch.optim.Adam(self.gen.parameters(),lr=LEARNING_RATE,betas=(0.5,0.9))
-		self.optD = torch.optim.Adam(self.disc.parameters(),lr=LEARNING_RATE,betas=(0.5,0.9))
+		self.optG = torch.optim.Adam(self.gen.parameters(),lr=LEARNING_RATE,betas=(0,0.99))
+		self.optD = torch.optim.Adam(self.disc.parameters(),lr=LEARNING_RATE,betas=(0,0.99))
 
 	def grow(self):
 		if self.progress != self.max_progress: self.progress += 1
@@ -157,6 +182,7 @@ class ProgGan(nn.Module):
 	# n is number of samples to generate
 	def generate(self,n):
 		x = torch.randn(n,100)
+		if USE_CUDA: x = x.cuda()
 		return self.gen(x)
 
 	def save_checkpoint(self):
@@ -168,3 +194,6 @@ class ProgGan(nn.Module):
 			print("Loaded checkpoint")
 		except:
 			print("Could not load checkpoint")
+
+	def forward(self,x):
+		return self.disc(self.gen(x))
