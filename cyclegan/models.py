@@ -157,9 +157,23 @@ class CycleGAN(nn.Module):
 
 		loss = nn.MSELoss()
 		
-		# Get losses, go backwards,step
-		A_loss = loss(score_A, real_labels) # Loss for G_BA
-		B_loss = loss(score_B, real_labels) # Loss for G_AB
+		# Get losses for single forward
+		A_loss_fwd = loss(score_A, real_labels) # Loss for G_BA
+		B_loss_fwd = loss(score_B, real_labels) # Loss for G_AB
+		
+		# Now cycle
+		rec_A = self.B_to_A(fake_B)
+		rec_B = self.A_to_B(fake_A)
+
+		score_rec_A = self.judge_A(rec_A)
+		score_rec_B = self.judge_B(rec_B)
+
+		# Get cycle loss
+		cycle_A_loss = CYCLE_WEIGHT*loss(score_rec_A, real_labels)
+		cycle_B_loss = CYCLE_WEIGHT*loss(score_rec_B, real_labels)
+	
+		A_loss = A_loss_fwd + cycle_A_loss
+		B_loss = B_loss_fwd + cycle_B_loss
 
 		A_loss.backward() 
 		B_loss.backward()

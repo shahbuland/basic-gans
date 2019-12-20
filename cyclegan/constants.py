@@ -10,6 +10,7 @@ BETAS = (0.5,0.9)
 
 # Training
 
+CYCLE_WEIGHT = 0.5
 ITERATIONS = 5000
 BATCH_SIZE = 16
 USE_CUDA = True
