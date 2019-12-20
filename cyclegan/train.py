@@ -38,10 +38,6 @@ def save_samples(title):
 	A_sample, B_sample = get_batch(4)
 	B_fake, A_fake = model.A_to_B(A_sample), model.B_to_A(B_sample)
 
-	print(torch.max(A_sample))
-	print(torch.min(A_sample))
-	print(torch.max(B_fake))
-	print(torch.min(B_fake))
 	A_sample = npimage(A_sample)
 	B_sample = npimage(B_sample)
 	A_fake = npimage(A_fake)

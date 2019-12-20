@@ -5,8 +5,8 @@ CHANNELS = 3
 
 # Hyperparams
 
-LEARNING_RATE = 2e-3
-BETAS = (0,0.99)
+LEARNING_RATE = 2e-4
+BETAS = (0.5,0.9)
 
 # Training
 
