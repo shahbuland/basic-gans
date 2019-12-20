@@ -9,11 +9,11 @@ INITIAL_PROGRESS = 1 # How many layers to use when training starts
 # Training
 
 LOAD_CHECKPOINTS = False
-ITERATIONS = 2000
+ITERATIONS = 5000
 BATCH_SIZE = 16
 SAMPLE_INTERVAL = 50
 CHECKPOINT_INTERVAL = 100
-GROW_INTERVAL = 50
+GROW_INTERVAL = 200
 
 # Related To General Model Stuff
 
